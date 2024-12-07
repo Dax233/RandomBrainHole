@@ -41,7 +41,7 @@ def random_word_info(file_path):
     # 随机选择一个词汇信息 
     word_info = df.iloc[random.randint(0, len(df) - 1)]
 
-    # 给无敌的、勇敢的、性感的、神秘的、迷人的、神气的、勤勉的、强势的、华丽的、激情的、可怕的、漂亮的、强大的脑洞王子署名
+    # 给无敌的、勇敢的、性感的、神秘的、迷人的、神气的、勤勉的、强势的、华丽的、激情的、可怕的、漂亮的、强大的脑洞桶子
     author = word_info.get('出题人', '暂无')
     if word_info.get('出题人', '暂无') == '——':
         author = '盐铁桶子'
@@ -61,7 +61,7 @@ def random_word_info(file_path):
         f"类型：{word_info.get('类型', '暂无')}\n"
         f"出题人：{author}\n"
         f"释义：{word_info.get('解释', '暂无')}\n"
-        f"场次：{match_info}\n"
+        f"场次：{match_info}"
     )
 
     return output
