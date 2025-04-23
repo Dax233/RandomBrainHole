@@ -3,6 +3,7 @@ import random
 import re
 from docx import Document
 from nonebot import on_keyword
+from nonebot.log import logger
 from nonebot.adapters.onebot.v11 import Bot, Event
 
 from ..config import Config
@@ -28,11 +29,14 @@ async def handle_random_fuzhipai(bot: Bot, event: Event):
     file_name = random.choice(doc_files)
     file_path = os.path.join(folder_path, file_name)
     
-    try:
-        card_info_output = random_fuzhipai_info(file_path)
-        await random_fuzhipai.send(card_info_output)
-    except Exception as e:
-        await random_fuzhipai.send(f"发生错误：{e}")
+    for i in range(2):
+        try:
+            card_info_output = random_fuzhipai_info(file_path)
+            await random_fuzhipai.send(card_info_output)
+            return
+        except Exception as e:
+            logger.info(f"第{i + 1}次尝试获取词汇失败。")
+    await random_fuzhipai.send("随机蝠汁牌被吃掉了~")
 
 def random_fuzhipai_info(file_path):
     # 读取Word文档

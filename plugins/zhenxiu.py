@@ -2,6 +2,7 @@ import os
 import random
 import pandas as pd
 from nonebot import on_keyword
+from nonebot.log import logger
 from nonebot.adapters.onebot.v11 import Bot, Event
 
 from ..config import Config
@@ -27,11 +28,14 @@ async def handle_random_zhenxiu(bot: Bot, event: Event):
     file_name = random.choice(xlsx_files)
     file_path = os.path.join(folder_path, file_name)
     
-    try:
-        word_info_output = random_zhenxiu_info(file_path)
-        await random_zhenxiu.send(word_info_output)
-    except Exception as e:
-        await random_zhenxiu.send(f"发生错误：{e}")
+    for i in range(2):
+        try:
+            card_info_output = random_zhenxiu_info(file_path)
+            await random_zhenxiu.send(card_info_output)
+            return
+        except Exception as e:
+            logger.info(f"第{i + 1}次尝试获取词汇失败。")
+    await random_zhenxiu.send("随机祯休被吃掉了~")
 
 def random_zhenxiu_info(file_path):
     # 读取Excel文件
