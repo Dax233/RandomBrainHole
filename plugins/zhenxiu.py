@@ -1,44 +1,31 @@
-import pandas as pd
-from typing import Optional
-from nonebot.log import logger
-from RandomBrainHole.db_utils import get_random_excel_row
+from typing import Optional, Dict, Any
+from nonebot import logger
+from ..db_utils import get_random_entry_from_db
 
-def random_zhenxiu_info(file_path: str) -> str:
-    """
-    从指定的 Excel 文件中随机读取一条祯休信息并格式化输出。
-    原逻辑: 随机选择一个子表，表头在第三行 (index 2), 对 NaN 值填充为 '无'。
-    使用通用的 get_random_excel_row 工具函数。
-
-    参数:
-        file_path (str): Excel 文件的完整路径。
-
-    返回:
-        str: 格式化后的祯休信息字符串。
-    """
-    plugin_name = "祯休"
+async def random_zhenxiu_info(table_name: str) -> str:
+    """从数据库中随机读取一条祯休信息并格式化输出。"""
+    plugin_display_name = "祯休"
     try:
-        # 祯休插件随机选择一个工作表 (sheet_name_or_index=None)，表头在第三行 (index 2)
-        word_info_raw: pd.Series = get_random_excel_row(
-            file_path,
-            sheet_name_or_index=None, # utils 函数内部会随机选择一个 sheet
-            header_row=2,            # 表头在第三行
-            plugin_name=plugin_name
-        )
-        
-        # 对 NaN 值进行填充
-        word_info = word_info_raw.fillna('无') # type: ignore
+        word_info: Optional[Dict[str, Any]] = await get_random_entry_from_db(table_name)
+        if not word_info:
+            logger.warning(f"{plugin_display_name}插件：无法从数据库表 {table_name} 获取词汇。")
+            raise ValueError(f"无法从数据库表 {table_name} 获取词汇。")
 
+        # 数据库列名: term_id_text, term, source_text, category, pinyin, definition, is_disyllabic
+        # 导入时已处理 fillna('无')
         output = (
-            f"[{plugin_name}]\n"
-            f"{word_info.get('拼音', '无')}\n" 
-            f"{word_info.get('词汇', '无')}\n"
-            f"出处：{word_info.get('出处', '无')}\n"
-            f"题型：{word_info.get('题型', '无')}\n"
-            f"解释：{word_info.get('解释', '无')}\n"
-            f"双音节：{word_info.get('双音节', '无')}" # 使用 .get 以防列名不存在，并提供默认值
+            f"[{plugin_display_name}]\n"
+            f"{word_info.get('pinyin', '无')}\n" 
+            f"{word_info.get('term', '无')}\n" 
+            f"出处：{word_info.get('source_text', '无')}\n"
+            f"题型：{word_info.get('category', '无')}\n" 
+            f"解释：{word_info.get('definition', '无')}\n"
+            f"双音节：{word_info.get('is_disyllabic', '无')}" 
+            # f"题号：{word_info.get('term_id_text', '无')}" # 如果需要显示题号
         )
         return output
-    except KeyError as e: # 理论上 .get() 会避免 KeyError，除非直接访问 word_info['不存在的列']
-        logger.error(f"{plugin_name}插件: 处理文件 {file_path} 时，列名 {e} 未找到。请检查 Excel 文件格式。")
-        raise ValueError(f"处理文件 {file_path} 时，数据格式错误（缺少列：{e}）。")
-    # ValueError 等其他异常由 get_random_excel_row 抛出并由 plugin_loader 捕获
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.opt(exception=e).error(f"{plugin_display_name}插件：处理从数据库获取的信息时出错 (表: {table_name})。")
+        raise ValueError(f"{plugin_display_name}插件处理数据失败。")
