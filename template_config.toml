@@ -6,7 +6,7 @@ base_data_path = "your/base/data/path/" # 请务必修改这里为你实际的�
 
 # 数据库文件路径 (相对于插件根目录，例如 RandomBrainHole/data/词库.db)
 # 这是插件运行时必需的配置
-database_path = "random_brainhole_data.db" # 例如，插件根目录下的 random_brainhole_data.db
+database_path = "database/random_brainhole_data.db" # 例如，插件根目录下的 random_brainhole_data.db
 
 # [[plugins]] 数组定义了每个子功能/词库的配置
 [[plugins]]
