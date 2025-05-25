@@ -91,32 +91,32 @@ graph TD
 graph LR
     U[用户]
 
-    subgraph DataSource [数据源文件]
+    subgraph DataSource ["数据源文件"]
         direction LR
-        Excel[词库.xlsx]
-        Word[词库.docx]
+        Excel["词库.xlsx"]
+        Word["词库.docx"]
     end
 
-    subgraph ImportProcess [数据导入脚本: import_data.py]
+    subgraph ImportProcess ["数据导入脚本: import_data.py"]
         direction TB
-        IP1[读取 config.toml中base_data_path, folder_name]
+        IP1["读取 config.toml中base_data_path, folder_name"]
         IP2["文件解析器 (parse_*.py)"]
-        IP3[数据哈希与比较]
-        IP4[数据插入逻辑]
+        IP3["数据哈希与比较"]
+        IP4["数据插入逻辑"]
     end
 
-    subgraph ConfigFiles [配置文件]
+    subgraph ConfigFiles ["配置文件"]
         direction TB
-        CFG[config.toml]
+        CFG["config.toml"]
     end
 
-    subgraph Database [SQLite数据库: random_brainhole_data.db]
+    subgraph Database ["SQLite数据库: random_brainhole_data.db"]
         direction TB
         DB_Tables["词库数据表 (e.g., brainhole_terms)"]
         DB_Log["imported_files_log 表"]
     end
 
-    subgraph PluginCore [RandomBrainHole 核心逻辑]
+    subgraph PluginCore ["RandomBrainHole 核心逻辑"]
         direction TB
         PC_Init["__init__.py: 初始化, 加载配置"]
         PC_Loader["plugin_loader.py: 消息处理与分发"]
@@ -124,32 +124,32 @@ graph LR
         PC_Plugins["plugins/*.py: 具体词库逻辑/格式化"]
     end
 
-    subgraph BotPlatform [NoneBot & OneBot]
+    subgraph BotPlatform ["NoneBot & OneBot"]
         direction TB
-        NB[NoneBot2 框架]
-        OB[OneBot V11 适配器]
+        NB["NoneBot2 框架"]
+        OB["OneBot V11 适配器"]
     end
 
-    DataSource -->|1. 手动放置| IP1
-    CFG -->|2. 读取配置| IP1
-    IP1 -->|3. 定位文件| IP2
-    IP2 -->|4. 解析后数据| IP4
-    IP3 -->|5. 文件是否更改| IP2
-    IP4 -->|6. 写入数据/日志| Database
+    DataSource -->|"手动放置文件"| IP1
+    CFG -->|"读取配置信息"| IP1
+    IP1 -->|"定位数据文件"| IP2
+    IP2 -->|"解析后数据"| IP4
+    IP3 -->|"文件是否更改"| IP2
+    IP4 -->|"写入数据与日志"| Database
 
-    U -- 7. 发送消息 --> OB
-    OB -- 8. 传递事件 --> NB
-    NB -- 9. 分发给插件 --> PC_Init
-    PC_Init -- 10. 加载配置 --> CFG
-    PC_Init -- 11. 触发消息处理 --> PC_Loader
-    PC_Loader -- 12. 请求数据 --> PC_DBUtils
-    PC_DBUtils -- 13. 读/写 --> Database
-    PC_DBUtils -- 14. 返回数据 --> PC_Loader
-    PC_Loader -- 15. 调用具体插件逻辑 --> PC_Plugins
-    PC_Plugins -- 16. 格式化数据 --> PC_Loader
-    PC_Loader -- 17. 准备响应 --> NB
-    NB -- 18. 通过适配器发送 --> OB
-    OB -- 19. 响应消息 --> U
+    U -- "发送消息" --> OB
+    OB -- "传递事件" --> NB
+    NB -- "分发给插件" --> PC_Init
+    PC_Init -- "加载配置" --> CFG
+    PC_Init -- "触发消息处理" --> PC_Loader
+    PC_Loader -- "请求数据" --> PC_DBUtils
+    PC_DBUtils -- "数据库读写" --> Database
+    PC_DBUtils -- "返回数据" --> PC_Loader
+    PC_Loader -- "调用插件逻辑" --> PC_Plugins
+    PC_Plugins -- "格式化数据" --> PC_Loader
+    PC_Loader -- "准备响应" --> NB
+    NB -- "通过适配器发送" --> OB
+    OB -- "响应消息" --> U
 ```
 
 ## 🚀 环境要求
