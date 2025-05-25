@@ -1,0 +1,80 @@
+# 全局基础数据路径，请根据你的实际情况修改
+# 例如 "/mnt/data/bot_resources/" 或 "D:/BotData/"
+# 如果插件的 folder_name 是绝对路径，则会忽略此基础路径
+# 请务必修改这里为你实际的基础路径，否则插件无法找到数据文件！
+base_data_path = "your/base/data/path/" 
+
+# 数据库文件路径 (相对于插件根目录，例如 RandomBrainHole/data/词库.db)
+# 建议将数据库文件放在插件目录下的一个子目录中，例如 "data/random_brainhole.db"
+# 如果插件部署时，工作目录不是插件根目录，可能需要使用绝对路径或更鲁棒的路径解析
+database_path = "random_brainhole_data.db"
+
+[[plugins]]
+name = "脑洞" 
+module_name = "brainhole" 
+info_function_name = "random_brainhole_info" 
+keywords = ["随机脑洞"] 
+folder_name = "brainhole_files" 
+file_extensions = [".xlsx"] 
+retry_attempts = 2 
+failure_message = "随机脑洞被吃掉了~" 
+
+[[plugins]]
+name = "#蝠汁牌"
+module_name = "fuzhipai"
+info_function_name = "random_fuzhipai_info"
+keywords = ["随机蝠汁牌"]
+folder_name = "fuzhipai_files"
+file_extensions = [".doc", ".docx"]
+retry_attempts = 2
+failure_message = "随机蝠汁牌被吃掉了~"
+
+[[plugins]]
+name = "拼释"
+module_name = "pinshi"
+info_function_name = "random_pinshi_info"
+keywords = ["随机拼释"]
+folder_name = "pinshi_files"
+file_extensions = [".xlsx"]
+retry_attempts = 2
+failure_message = "随机拼释被吃掉了~"
+
+[[plugins]]
+name = "#随蓝"
+module_name = "suilan"
+info_function_name = "random_suilan_info"
+keywords = ["随机随蓝"]
+folder_name = "suilan_files" 
+file_extensions = [".xlsx"]
+retry_attempts = 2
+failure_message = "随机随蓝被吃掉了~"
+
+[[plugins]]
+name = "五行"
+module_name = "Wuxing" 
+info_function_name = "random_wuxing_info"
+keywords = ["随机五行"]
+folder_name = "wuxing_files" 
+file_extensions = [".xlsx"]
+retry_attempts = 2
+failure_message = "随机五行被吃掉了~"
+
+[[plugins]]
+name = "元晓"
+module_name = "yuanxiao"
+info_function_name = "random_yuanxiao_info"
+keywords = ["随机元晓"]
+folder_name = "yuanxiao_files" 
+file_extensions = [".xlsx"]
+retry_attempts = 2
+failure_message = "随机元晓被吃掉了~"
+
+[[plugins]]
+name = "#祯休"
+module_name = "zhenxiu"
+info_function_name = "random_zhenxiu_info"
+keywords = ["随机祯休"]
+folder_name = "zhenxiu_files" 
+file_extensions = [".xlsx"]
+retry_attempts = 2
+failure_message = "随机祯休被吃掉了~"

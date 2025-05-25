@@ -1,48 +1,46 @@
-import os
-import random
-import pandas as pd
-from nonebot import on_keyword
+import pandas as pd # 保留用于类型提示 (Optional[pd.Series])
+from typing import Optional # 导入 Optional
 from nonebot.log import logger
-from nonebot.adapters.onebot.v11 import Bot, Event
+from RandomBrainHole.db_utils import get_random_excel_row # 导入新的工具函数
 
-from ..config import Config
+def random_pinshi_info(file_path: str) -> str:
+    """
+    从指定的 Excel 文件中随机读取一条拼释信息并格式化输出。
+    使用通用的 get_random_excel_row 工具函数。
 
-# 设置关键词触发
-random_pinshi = on_keyword({"随机拼释"})
+    参数:
+        file_path (str): Excel 文件的完整路径。
 
-@random_pinshi.handle()
-async def handle_random_pinshi(bot: Bot, event: Event):
-    config = Config()
-
-    # 文件夹路径，需要根据实际情况进行调整
-    folder_path = 'your file path'
-    file_name = random.choice([file for file in os.listdir(folder_path) if file.endswith('.xlsx')])
-    file_path = os.path.join(folder_path, file_name)
+    返回:
+        str: 格式化后的拼释信息字符串。
     
-    for i in range(2):
-        try:
-            card_info_output = random_pinshi_info(file_path)
-            await random_pinshi.send(card_info_output)
-            return
-        except Exception as e:
-            logger.info(f"第{i + 1}次尝试获取词汇失败。")
-    await random_pinshi.send("随机拼释被吃掉了~")
-
-def random_pinshi_info(file_path):
-    # 读取Excel文件
-    df = pd.read_excel(file_path, header=0)  # 第一行作为表头
-
-    # 随机选择一个词汇信息
-    word_info = df.iloc[random.randint(0, len(df) - 1)]
-
-    output = (
-        "[随机拼释]\n"
-        f"{word_info['拼音']}\n"
-        f"{word_info['题目']}\n"
-        f"出处：{word_info['出处']}\n"
-        f"书写：{word_info['书写']}\n"
-        f"难度：{word_info['难度']}\n"
-        f"解释：{word_info['解释']}"
-    )
-
-    return output
+    可能抛出:
+        与 get_random_excel_row 相同的异常 (FileNotFoundError, ValueError, etc.)
+        KeyError: 如果返回的 Series 中缺少预期的列名。
+    """
+    plugin_name = "拼释"
+    try:
+        # 拼释插件通常读取第一个工作表，表头在第一行 (index 0)
+        word_info: pd.Series = get_random_excel_row( # 类型提示改为 pd.Series
+            file_path,
+            sheet_name_or_index=0, # 第一个工作表
+            header_row=0,          # 表头在第一行
+            plugin_name=plugin_name
+        )
+        
+        # get_random_excel_row 现在会抛出异常而不是返回 None
+        output = (
+            f"[{plugin_name}]\n" # 使用 plugin_name 变量
+            f"{word_info.get('拼音', '暂无')}\n"
+            f"{word_info.get('题目', '暂无')}\n"
+            f"出处：{word_info.get('出处', '暂无')}\n"
+            f"书写：{word_info.get('书写', '暂无')}\n"
+            f"难度：{word_info.get('难度', '暂无')}\n"
+            f"解释：{word_info.get('解释', '暂无')}"
+        )
+        return output
+    except KeyError as e:
+        logger.error(f"{plugin_name}插件: 处理文件 {file_path} 时，列名 {e} 未找到。请检查 Excel 文件格式。")
+        raise ValueError(f"处理文件 {file_path} 时，数据格式错误（缺少列：{e}）。")
+    # get_random_excel_row 会处理 FileNotFoundError 和 ValueError (空表等)
+    # 所以这里不需要重复捕获，除非要添加特定于拼释插件的额外处理

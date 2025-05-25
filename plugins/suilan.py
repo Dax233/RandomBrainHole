@@ -1,48 +1,41 @@
-import os
-import random
 import pandas as pd
-from nonebot import on_keyword
+from typing import Optional
 from nonebot.log import logger
-from nonebot.adapters.onebot.v11 import Bot, Event
+from RandomBrainHole.db_utils import get_random_excel_row
 
-from ..config import Config
+def random_suilan_info(file_path: str) -> str:
+    """
+    从指定的 Excel 文件中随机读取一条随蓝信息并格式化输出。
+    （原逻辑假设第二个子表是词表，表头在第一行）
+    使用通用的 get_random_excel_row 工具函数。
 
-# 设置关键词触发
-random_suilan = on_keyword({"随机随蓝"})
+    参数:
+        file_path (str): Excel 文件的完整路径。
 
-@random_suilan.handle()
-async def handle_random_suilan(bot: Bot, event: Event):
-    config = Config()
+    返回:
+        str: 格式化后的随蓝信息字符串。
+    """
+    plugin_name = "随蓝"
+    try:
+        # 随蓝插件原逻辑是读取第二个工作表 (index 1)，表头在第一行 (index 0)
+        word_info: pd.Series = get_random_excel_row(
+            file_path,
+            sheet_name_or_index=1, # 第二个工作表
+            header_row=0,          # 表头在第一行
+            plugin_name=plugin_name
+        )
 
-    # 文件夹路径，需要根据实际情况进行调整
-    folder_path = 'your file path'
-    file_name = random.choice([file for file in os.listdir(folder_path) if file.endswith('.xlsx')])
-    file_path = os.path.join(folder_path, file_name)
-    
-    for i in range(2):
-        try:
-            card_info_output = random_suilan_info(file_path)
-            await random_suilan.send(card_info_output)
-            return
-        except Exception as e:
-            logger.info(f"第{i + 1}次尝试获取词汇失败。")
-    await random_suilan.send("随机随蓝被吃掉了~")
-
-def random_suilan_info(file_path):
-    # 读取Excel文件
-    xls = pd.ExcelFile(file_path)
-    # 假设第二个子表是随机随蓝的词表
-    df = pd.read_excel(xls, sheet_name=xls.sheet_names[1], header=0)  # 第二个子表并从第一行开始
-
-    # 随机选择一个词汇信息
-    word_info = df.iloc[random.randint(0, len(df) - 1)]
-
-    output = (
-        "[随机随蓝]\n"
-        f"{word_info['题面']}\n"
-        f"选手：{word_info['选手']}\n"
-        f"出处：{word_info['出处']}\n"
-        f"解释：{word_info['解释']}"
-    )
-
-    return output
+        output = (
+            f"[{plugin_name}]\n"
+            f"{word_info.get('题面', '暂无')}\n"
+            f"选手：{word_info.get('选手', '暂无')}\n"
+            f"出处：{word_info.get('出处', '暂无')}\n"
+            f"解释：{word_info.get('解释', '暂无')}"
+        )
+        return output
+    except KeyError as e:
+        logger.error(f"{plugin_name}插件: 处理文件 {file_path} 时，列名 {e} 未找到。请检查 Excel 文件格式。")
+        raise ValueError(f"处理文件 {file_path} 时，数据格式错误（缺少列：{e}）。")
+    except IndexError as e: # get_random_excel_row 内部的 pandas 调用可能因 sheet 索引越界抛出
+        logger.error(f"{plugin_name}插件: 文件 {file_path} 可能没有第二个工作表，或工作表索引配置错误: {e}")
+        raise ValueError(f"文件 {file_path} 工作表配置错误（可能没有第二个工作表）。")

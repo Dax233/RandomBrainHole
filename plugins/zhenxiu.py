@@ -1,69 +1,44 @@
-import os
-import random
 import pandas as pd
-from nonebot import on_keyword
+from typing import Optional
 from nonebot.log import logger
-from nonebot.adapters.onebot.v11 import Bot, Event
+from RandomBrainHole.db_utils import get_random_excel_row
 
-from ..config import Config
+def random_zhenxiu_info(file_path: str) -> str:
+    """
+    从指定的 Excel 文件中随机读取一条祯休信息并格式化输出。
+    原逻辑: 随机选择一个子表，表头在第三行 (index 2), 对 NaN 值填充为 '无'。
+    使用通用的 get_random_excel_row 工具函数。
 
-# 设置关键词触发
-random_zhenxiu = on_keyword({"随机祯休"})
+    参数:
+        file_path (str): Excel 文件的完整路径。
 
-@random_zhenxiu.handle()
-async def handle_random_zhenxiu(bot: Bot, event: Event):
-    config = Config()
+    返回:
+        str: 格式化后的祯休信息字符串。
+    """
+    plugin_name = "祯休"
+    try:
+        # 祯休插件随机选择一个工作表 (sheet_name_or_index=None)，表头在第三行 (index 2)
+        word_info_raw: pd.Series = get_random_excel_row(
+            file_path,
+            sheet_name_or_index=None, # utils 函数内部会随机选择一个 sheet
+            header_row=2,            # 表头在第三行
+            plugin_name=plugin_name
+        )
+        
+        # 对 NaN 值进行填充
+        word_info = word_info_raw.fillna('无') # type: ignore
 
-    # 文件夹路径，需要根据实际情况进行调整
-    folder_path = 'your file path'
-    if not os.path.exists(folder_path):
-        await random_zhenxiu.send("文件夹路径不存在")
-        return
-
-    xlsx_files = [file for file in os.listdir(folder_path) if file.endswith('.xlsx')]
-    if not xlsx_files:
-        await random_zhenxiu.send("文件夹中没有找到任何 .xlsx 文件")
-        return
-
-    file_name = random.choice(xlsx_files)
-    file_path = os.path.join(folder_path, file_name)
-    
-    for i in range(2):
-        try:
-            card_info_output = random_zhenxiu_info(file_path)
-            await random_zhenxiu.send(card_info_output)
-            return
-        except Exception as e:
-            logger.info(f"第{i + 1}次尝试获取词汇失败。")
-    await random_zhenxiu.send("随机祯休被吃掉了~")
-
-def random_zhenxiu_info(file_path):
-    # 读取Excel文件
-    xls = pd.ExcelFile(file_path)
-    
-    # 随机选择一个子表
-    sheet_name = random.choice(xls.sheet_names)
-    df = pd.read_excel(xls, sheet_name=sheet_name, header=2)
-    
-    if df.empty:
-        raise ValueError(f"子表 {sheet_name} 为空")
-    
-    # 确保列名正确无误
-    expected_columns = ['题号', '词汇', '出处', '题型', '拼音', '解释', '双音节']
-    if list(df.columns)[:len(expected_columns)] != expected_columns:
-        raise ValueError("数据框的列名不匹配，可能需要调整 header 参数")
-
-    # 随机选择一个词汇信息
-    word_info = df.iloc[random.randint(0, len(df) - 1)].fillna('无')
-
-    output = (
-        "[随机祯休]\n"
-        f"{word_info['拼音']}\n"
-        f"{word_info['词汇']}\n"
-        f"出处：{word_info['出处']}\n"
-        f"题型：{word_info['题型']}\n"
-        f"解释：{word_info['解释']}\n"
-        f"双音节：{word_info['双音节']}"
-    )
-
-    return output
+        output = (
+            f"[{plugin_name}]\n"
+            f"{word_info.get('拼音', '无')}\n" 
+            f"{word_info.get('词汇', '无')}\n"
+            f"出处：{word_info.get('出处', '无')}\n"
+            f"题型：{word_info.get('题型', '无')}\n"
+            f"解释：{word_info.get('解释', '无')}\n"
+            f"双音节：{word_info.get('双音节', '无')}" # 使用 .get 以防列名不存在，并提供默认值
+        )
+        return output
+    except KeyError as e: # 理论上 .get() 会避免 KeyError，除非直接访问 word_info['不存在的列']
+        logger.error(f"{plugin_name}插件: 处理文件 {file_path} 时，列名 {e} 未找到。请检查 Excel 文件格式。")
+        raise ValueError(f"处理文件 {file_path} 时，数据格式错误（缺少列：{e}）。")
+    # ValueError 等其他异常由 get_random_excel_row 抛出并由 plugin_loader 捕获
