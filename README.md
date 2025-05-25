@@ -8,9 +8,9 @@
 -   **数据库存储**：所有词库数据通过 `import_data.py` 脚本导入 SQLite 数据库，提高查询效率和数据管理的便捷性。
 -   **随机获取**：用户可以通过发送在 `config.toml` 中为各词库配置的关键词（例如“随机脑洞”）来随机获取一条词条信息。
 -   **查词功能**：用户可以使用 `查词 <关键词>` 命令来搜索所有已配置词库中与 `<关键词>` 相关的词条。
--   **随机填词**：用户可以使用 `随机填词 <包含占位符的模板>` 命令，插件会将模板中的 `[词库名]` 占位符替换为对应词库中的随机词条。
-    -   例如：`随机填词 今天天气真[脑洞]，心情有点[拼释]。`
-    -   占位符中的“词库名”对应 `config.toml` 里各 `plugins` 条目下的 `folder_name` 字段。
+-   **随机填词**：用户可以使用 `随机填词 <包含占位符的模板>` 命令，插件会将模板中的 `词库名` 占位符（直接使用 `config.toml` 中定义的 `folder_name`）替换为对应词库中的随机词条。
+    -   例如：如果 `folder_name` 分别为 `脑洞词库` 和 `拼释词库`，则发送 `随机填词 今天天气真脑洞词库，心情有点拼释词库。`
+    -   如果想在文本中直接使用与 `folder_name` 相同的文字而不被替换，可以在其前面加上反斜杠 `\` 进行转义，例如 `随机填词 我想说的是\脑洞词库本身这个词。`
 -   **数据导入脚本**：提供 `import_data.py` 脚本，支持从特定格式的 Excel (.xlsx) 和 Word (.docx) 文件中解析数据并导入数据库。
     -   脚本支持文件哈希检查，避免重复导入未更改的文件。
     -   导入前会进行示例数据展示和用户确认。
@@ -103,7 +103,8 @@ database_path = "data/random_brainhole_data.db"
   # 触发此插件随机功能的关键词列表。
   keywords = ["随机脑洞", "来个脑洞", "脑洞时刻"]
   # (供 import_data.py 使用) 存放此类型词库数据文件的文件夹名称 (相对于 base_data_path)。
-  folder_name = "脑洞词库" # 例如，如果 base_data_path 是 "E:/MyLexicons"，则数据在 "E:/MyLexicons/脑洞词库/"
+  # 此名称也用作“随机填词”功能中的占位符。
+  folder_name = "脑洞词库" 
   # (供 import_data.py 使用) 支持的文件扩展名列表。
   file_extensions = [".xlsx"]
   # 获取数据失败时的重试次数。
@@ -117,9 +118,9 @@ database_path = "data/random_brainhole_data.db"
   info_function_name = "random_pinshi_info"
   format_function_name = "format_pinshi_data"
   table_name = "pinshi_terms"
-  search_column_name = "term" # 假设拼释的主要词条也在 "term" 列
+  search_column_name = "term" 
   keywords = ["随机拼释", "来个拼释"]
-  folder_name = "拼释词库"
+  folder_name = "拼释词库" # 随机填词占位符：拼释词库
   file_extensions = [".xlsx"]
   retry_attempts = 2
   failure_message = "拼释词库今天休息了~"
@@ -130,10 +131,9 @@ database_path = "data/random_brainhole_data.db"
   info_function_name = "random_fuzhipai_info"
   format_function_name = "format_fuzhipai_data"
   table_name = "fuzhipai_cards"
-  # 蝠汁牌的“词条”可能是整个卡牌内容，对应数据库的 full_text 列
-  search_column_name = "full_text" # 或者 card_title 如果想按标题搜索
+  search_column_name = "full_text" 
   keywords = ["随机蝠汁牌", "抽一张蝠汁牌"]
-  folder_name = "蝠汁牌库" # 这也是随机填词时用的占位符名称，例如 [蝠汁牌库]
+  folder_name = "蝠汁牌库" # 随机填词占位符：蝠汁牌库
   file_extensions = [".docx"]
   retry_attempts = 2
   failure_message = "找不到蝠汁牌了，它们可能飞走了！"
@@ -153,7 +153,7 @@ database_path = "data/random_brainhole_data.db"
     -   `table_name`: 此词库数据在 SQLite 数据库中对应的表名。
     -   `search_column_name`: 当使用“查词”功能时，主要在此列中搜索用户提供的关键词。当使用“随机填词”时，从此列获取要填入的词条。
     -   `keywords`: 用户发送包含这些词的消息时，会触发对应词库的随机词条功能。
-    -   `folder_name`: `import_data.py` 会在 `base_data_path` 下的这个子文件夹中查找原始数据文件。**此名称也用作“随机填词”功能中的占位符，例如 `[folder_name]`**。
+    -   `folder_name`: `import_data.py` 会在 `base_data_path` 下的这个子文件夹中查找原始数据文件。**此名称也用作“随机填词”功能中的占位符（例如 `folder_name`），使用 `\folder_name` 进行转义**。
     -   `file_extensions`: `import_data.py` 会查找这些扩展名的文件。
     -   `retry_attempts`, `failure_message`: 随机获取功能失败时的重试和提示。
 
@@ -204,23 +204,25 @@ database_path = "data/random_brainhole_data.db"
 
 3.  **随机填词**：
     发送 `随机填词 <包含占位符的模板文本>`
-    占位符的格式为 `[词库名]`，其中“词库名”必须是 `config.toml` 中某个 `plugins` 条目下 `folder_name` 字段的值。
+    占位符的格式为 `词库名` (直接使用 `config.toml` 中 `folder_name` 的值)。如果想在文本中原样输出词库名，请在其前加反斜杠 `\` 转义。
     例如：
     -   `config.toml` 中有：
         ```toml
         [[plugins]]
           name = "趣味脑洞"
-          folder_name = "趣味脑洞占位符" # 这个是占位符名称
+          folder_name = "趣味脑洞占位符" 
           search_column_name = "term"
           # ... 其他配置 ...
         [[plugins]]
           name = "心情短语"
-          folder_name = "心情占位符" # 这个是占位符名称
+          folder_name = "心情占位符" 
           search_column_name = "phrase"
           # ... 其他配置 ...
         ```
-    -   用户发送：`随机填词 我今天想到了一个[趣味脑洞占位符]，感觉像是[心情占位符]！`
-    -   插件会从“趣味脑洞”词库的 `term` 列随机取一个词替换 `[趣味脑洞占位符]`，从“心情短语”词库的 `phrase` 列随机取一个词替换 `[心情占位符]`。
+    -   用户发送：`随机填词 我今天想到了一个趣味脑洞占位符，感觉像是心情占位符！`
+    -   插件会从“趣味脑洞”词库的 `term` 列随机取一个词替换 `趣味脑洞占位符`，从“心情短语”词库的 `phrase` 列随机取一个词替换 `心情占位符`。
+    -   用户发送：`随机填词 我想描述的是\趣味脑洞占位符这个概念。`
+    -   插件会输出：`我想描述的是趣味脑洞占位符这个概念。`
 
 ## 🧩 扩展新词库
 
@@ -246,14 +248,14 @@ database_path = "data/random_brainhole_data.db"
     ```toml
     [[plugins]]
       name = "歇后语"
-      module_name = "xhy" # 对应刚创建的 xhy.py
-      info_function_name = "random_xhy_info" # xhy.py 中的函数
-      format_function_name = "format_xhy_data" # xhy.py 中的函数
-      table_name = "xhy_terms" # 数据库表名
-      search_column_name = "question" # 假设歇后语的“问题”部分是主要搜索列
+      module_name = "xhy" 
+      info_function_name = "random_xhy_info" 
+      format_function_name = "format_xhy_data" 
+      table_name = "xhy_terms" 
+      search_column_name = "question" 
       keywords = ["随机歇后语", "来个歇后语"]
-      folder_name = "歇后语数据" # 数据导入时用的文件夹名，也是填词占位符 [歇后语数据]
-      file_extensions = [".xlsx"] # 假设数据是 Excel
+      folder_name = "歇后语数据" # 随机填词占位符：歇后语数据
+      file_extensions = [".xlsx"] 
       retry_attempts = 2
       failure_message = "今天想不出歇后语啦。"
     ```
@@ -298,4 +300,3 @@ database_path = "data/random_brainhole_data.db"
 ## 📜 许可证
 
 MIT License @ Dax233 (原作者) 及后续贡献者。
-

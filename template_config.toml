@@ -6,14 +6,14 @@
 # 如果是相对路径，它通常相对于 import_data.py 脚本的运行位置，
 # 或者由脚本内部的路径解析逻辑处理。
 # 建议使用绝对路径，或相对于插件根目录的路径。
-# 示例: base_data_path = "/path/to/your/data_files/"
+# 示例: base_data_path = "src/data/randomND"
 # 示例: base_data_path = "data/" # (如果 'data' 文件夹位于插件根目录下)
 base_data_path = "your/base/data/path/"
 
 # SQLite 数据库文件的路径。
 # 如果是相对路径，将在插件的根目录下创建或查找。
-# 示例: database_path = "data/my_brainhole_data.db"
-database_path = "random_brainhole_data.db"
+# 示例: database_path = "database/random_brainhole_data.db"
+database_path = "database/random_brainhole_data.db"
 
 # [[plugins]] 标记一个插件配置块的开始。
 # 您可以为不同的功能定义多个 [[plugins]] 配置块。
@@ -55,6 +55,7 @@ keywords = ["随机脑洞", "脑洞一下", "示例脑洞"]
 # 此配置由 import_data.py 脚本使用。
 # 例如: 如果 base_data_path = "data/" 且您的脑洞文件位于 "data/my_brainholes/",
 # 则 folder_name = "my_brainholes"
+# 随机填词将采用该项的值进行填写
 folder_name = "脑洞" # 对应 'base_data_path' 下的子文件夹
 
 # 应为此插件处理的数据文件的扩展名列表。
