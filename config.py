@@ -8,8 +8,10 @@ from nonebot import logger as nb_logger # 使用 NoneBot 的 logger
 class PluginSetting(BaseModel):
     name: str # 插件的友好名称
     module_name: str # 对应的 Python 模块名 (不含 .py)
-    info_function_name: str # 模块内处理信息的主函数名
+    info_function_name: str # 模块内处理随机信息的主函数名
+    format_function_name: str # 新增：模块内处理特定词条格式化的函数名
     table_name: str  # 此插件对应数据库中的表名
+    search_column_name: str = "term" # 新增：用于搜索的列名，默认为 "term"
     keywords: List[str] # 触发此插件的关键词列表
     folder_name: str # (主要供 import_data.py 使用) 数据文件所在文件夹名称
     file_extensions: List[str] # (主要供 import_data.py 使用) 支持的文件扩展名
@@ -49,11 +51,19 @@ def _load_config_internal() -> Config:
             nb_logger.warning(f"配置文件 {config_file_path} 中的 database_path 未配置，将使用默认值 'random_brainhole_data.db'。")
             loaded_config.database_path = "random_brainhole_data.db" # 确保有个值
 
-        # 校验每个 plugin 是否有 table_name
+        # 校验每个 plugin 的必要配置
         for p_setting in loaded_config.plugins:
             if not hasattr(p_setting, 'table_name') or not p_setting.table_name:
                 nb_logger.error(f"插件 '{p_setting.name}' 在 config.toml 中缺少必要的 'table_name' 配置项。")
                 raise ValueError(f"插件 '{p_setting.name}' 缺少 'table_name' 配置。")
+            if not hasattr(p_setting, 'format_function_name') or not p_setting.format_function_name:
+                nb_logger.error(f"插件 '{p_setting.name}' 在 config.toml 中缺少必要的 'format_function_name' 配置项。")
+                raise ValueError(f"插件 '{p_setting.name}' 缺少 'format_function_name' 配置。")
+            # search_column_name 有默认值 "term"，所以不强制检查，但可以提示如果它为空
+            if not hasattr(p_setting, 'search_column_name') or not p_setting.search_column_name:
+                 nb_logger.warning(f"插件 '{p_setting.name}' 未明确配置 'search_column_name'，将使用默认值 'term'。")
+
+
         return loaded_config
     except ValueError as ve: # 特别捕捉 Pydantic 校验错误或我们自己抛出的 ValueError
         nb_logger.opt(exception=ve).error(f"加载配置文件 {config_file_path} 失败，配置项校验错误。")

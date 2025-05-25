@@ -1,87 +1,117 @@
-# 全局基础数据路径，主要供数据导入脚本 import_data.py 使用
-# 请根据你的实际情况修改，例如 "/mnt/data/bot_resources/" 或 "D:/BotData/"
-# 如果插件的 folder_name 是绝对路径，则会忽略此基础路径
-# 在插件正常运行时，此路径不是必需的，因为数据已在数据库中
-base_data_path = "your/base/data/path/" # 请务必修改这里为你实际的基础路径！
+# 这是 RandomBrainHole 插件的配置模板文件。
+# 请根据您的实际设置填写必要的值。
 
-# 数据库文件路径 (相对于插件根目录，例如 RandomBrainHole/data/词库.db)
-# 这是插件运行时必需的配置
-database_path = "database/random_brainhole_data.db" # 例如，插件根目录下的 random_brainhole_data.db
+# (可选) 您的数据文件（如 Excel、Word 文档）的基础存储路径。
+# 这个配置主要由 import_data.py 脚本使用。
+# 如果是相对路径，它通常相对于 import_data.py 脚本的运行位置，
+# 或者由脚本内部的路径解析逻辑处理。
+# 建议使用绝对路径，或相对于插件根目录的路径。
+# 示例: base_data_path = "/path/to/your/data_files/"
+# 示例: base_data_path = "data/" # (如果 'data' 文件夹位于插件根目录下)
+base_data_path = "your/base/data/path/"
 
-# [[plugins]] 数组定义了每个子功能/词库的配置
-[[plugins]]
-name = "脑洞" # 插件的友好名称，日志中可能会用到
-module_name = "brainhole" # 对应的 plugins 目录下的 Python 文件名 (不含 .py)
-info_function_name = "random_brainhole_info" # 该 Python 文件中处理信息的主函数名
-table_name = "brainhole_terms"  # <--- 脑洞插件对应数据库中的表名
-keywords = ["随机脑洞", "脑洞"] # 触发此插件的关键词列表
-folder_name = "brainhole_files" # (供 import_data.py 使用) 数据文件所在文件夹名称
-file_extensions = [".xlsx"]     # (供 import_data.py 使用) 支持的文件扩展名
-retry_attempts = 2 # 获取数据失败时的重试次数
-failure_message = "随机脑洞被吃掉了~" # 最终失败时发送的消息
+# SQLite 数据库文件的路径。
+# 如果是相对路径，将在插件的根目录下创建或查找。
+# 示例: database_path = "data/my_brainhole_data.db"
+database_path = "random_brainhole_data.db"
+
+# [[plugins]] 标记一个插件配置块的开始。
+# 您可以为不同的功能定义多个 [[plugins]] 配置块。
 
 [[plugins]]
-name = "蝠汁牌"
-module_name = "fuzhipai"
-info_function_name = "random_fuzhipai_info"
-table_name = "fuzhipai_cards" # <--- 蝠汁牌插件对应数据库中的表名
-keywords = ["随机蝠汁牌", "蝠汁牌"]
-folder_name = "fuzhipai_files"
-file_extensions = [".doc", ".docx"]
-retry_attempts = 2
-failure_message = "随机蝠汁牌被吃掉了~"
+# 插件模块的友好名称 (例如："我的脑洞合集")。
+name = "示例脑洞"
 
-[[plugins]]
-name = "拼释"
-module_name = "pinshi"
-info_function_name = "random_pinshi_info"
-table_name = "pinshi_terms" # <--- 拼释插件对应数据库中的表名
-keywords = ["随机拼释", "拼释"]
-folder_name = "pinshi_files"
+# 位于 'plugins' 子文件夹中的 Python 模块名称 (不含 .py 后缀的文件名)。
+# 例如: 如果您的插件文件是 'RandomBrainHole/plugins/my_plugin.py', 则 module_name = "my_plugin"
+module_name = "brainhole" # 对应 RandomBrainHole/plugins/brainhole.py
+
+# 'module_name' 指定的模块内的异步函数名称。
+# 当触发关键词时，此函数将被调用以获取随机条目。
+# 此函数应接受 'table_name' (str) 作为参数，并返回一个格式化后的字符串。
+info_function_name = "random_brainhole_info"
+
+# 'module_name' 指定的模块内的异步函数名称。
+# 当使用 "查词" 命令找到特定条目时，此函数将被调用以格式化该条目。
+# 此函数应接受 'word_info' (dict) 和 'is_search_result' (bool) 
+# 作为参数，并返回一个格式化后的字符串。
+format_function_name = "format_brainhole_data"
+
+# 与此插件关联的数据库表名。
+# 此表将存储为此插件导入的数据。
+table_name = "brainhole_terms"
+
+# 'table_name' 指定的表中的列名。
+# 当为此插件使用 "查词" 命令时，将在此列中搜索。
+# 如果在 config.py 的 Pydantic 模型中未指定，则默认为 "term"，
+# 但在此处明确指定是个好习惯。
+search_column_name = "term"
+
+# 触发此插件的关键词列表。
+# 如果消息中包含这些关键词中的任何一个，则会调用 'info_function_name'。
+keywords = ["随机脑洞", "脑洞一下", "示例脑洞"]
+
+# 数据文件所在文件夹的名称（相对于 'base_data_path'）。
+# 此配置由 import_data.py 脚本使用。
+# 例如: 如果 base_data_path = "data/" 且您的脑洞文件位于 "data/my_brainholes/",
+# 则 folder_name = "my_brainholes"
+folder_name = "脑洞" # 对应 'base_data_path' 下的子文件夹
+
+# 应为此插件处理的数据文件的扩展名列表。
+# 由 import_data.py 脚本使用。(例如: [".xlsx", ".csv"])
 file_extensions = [".xlsx"]
-retry_attempts = 2
-failure_message = "随机拼释被吃掉了~"
 
-[[plugins]]
-name = "随蓝"
-module_name = "suilan"
-info_function_name = "random_suilan_info"
-table_name = "suilan_terms" # <--- 随蓝插件对应数据库中的表名
-keywords = ["随机随蓝", "随蓝"]
-folder_name = "suilan_files" 
-file_extensions = [".xlsx"]
+# 如果调用 'info_function_name' 失败（例如数据库错误、无数据），则重试的次数。
 retry_attempts = 2
-failure_message = "随机随蓝被吃掉了~"
 
-[[plugins]]
-name = "五行"
-module_name = "Wuxing" # 注意文件名大小写
-info_function_name = "random_wuxing_info"
-table_name = "wuxing_terms" # <--- 五行插件对应数据库中的表名
-keywords = ["随机五行", "五行"]
-folder_name = "wuxing_files" 
-file_extensions = [".xlsx"]
-retry_attempts = 2
-failure_message = "随机五行被吃掉了~"
+# 如果所有重试尝试均失败，则发送给用户的消息。
+failure_message = "今天脑洞枯竭了，过会儿再来吧！"
 
-[[plugins]]
-name = "元晓"
-module_name = "yuanxiao"
-info_function_name = "random_yuanxiao_info"
-table_name = "yuanxiao_terms" # <--- 元晓插件对应数据库中的表名
-keywords = ["随机元晓", "元晓"]
-folder_name = "yuanxiao_files" 
-file_extensions = [".xlsx"]
-retry_attempts = 2
-failure_message = "随机元晓被吃掉了~"
+# --- 其他插件配置示例 ---
+# [[plugins]]
+# name = "示例拼释"
+# module_name = "pinshi" # 假设您有 RandomBrainHole/plugins/pinshi.py
+# info_function_name = "random_pinshi_info"
+# format_function_name = "format_pinshi_data"
+# table_name = "pinshi_terms"
+# search_column_name = "term" # 或者 'pinshi_terms' 表中用于搜索的列名
+# keywords = ["随机拼释", "来个拼释", "示例拼释"]
+# folder_name = "拼释" # 'base_data_path' 下的子文件夹
+# file_extensions = [".xlsx"]
+# retry_attempts = 2
+# failure_message = "拼释词库今天有点害羞，不肯出来。"
 
-[[plugins]]
-name = "祯休"
-module_name = "zhenxiu"
-info_function_name = "random_zhenxiu_info"
-table_name = "zhenxiu_terms" # <--- 祯休插件对应数据库中的表名
-keywords = ["随机祯休", "祯休"]
-folder_name = "zhenxiu_files" 
-file_extensions = [".xlsx"]
-retry_attempts = 2
-failure_message = "随机祯休被吃掉了~"
+# --- 蝠汁牌插件配置示例 ---
+# [[plugins]]
+# name = "蝠汁牌"
+# module_name = "fuzhipai"
+# info_function_name = "random_fuzhipai_info"
+# format_function_name = "format_fuzhipai_data"
+# table_name = "fuzhipai_cards"
+# # 对于蝠汁牌，您可能希望按 'card_title' (卡牌标题) 或 'full_text' (完整文本) 搜索。
+# # 如果搜索 'full_text'，请考虑是否需要模糊匹配 (SQL中的 LIKE) 而非精确匹配。
+# # 当前 "查词" 功能的实现是精确匹配。
+# search_column_name = "card_title" # 示例：按卡牌标题搜索
+# keywords = ["随机蝠汁牌", "一张蝠汁牌"]
+# folder_name = "蝠汁牌"
+# file_extensions = [".docx"]
+# retry_attempts = 1
+# failure_message = "没抽到蝠汁牌，下次一定！"
+
+# 为其他数据类型（如 随蓝, 五行, 元晓, 祯休等）添加更多的 [[plugins]] 配置块。
+# 确保为每个插件正确设置 'module_name', 'info_function_name', 'format_function_name', 
+# 'table_name', 'search_column_name', 'folder_name', 和 'keywords'。
+
+# --- 通用插件配置示例 ---
+# [[plugins]]
+# name = "我的自定义数据"
+# module_name = "my_custom_plugin" # 创建 RandomBrainHole/plugins/my_custom_plugin.py
+# info_function_name = "get_random_custom_data" # 在 my_custom_plugin.py 中实现此函数
+# format_function_name = "format_custom_data_entry" # 为搜索结果实现此函数
+# table_name = "my_custom_table" # 在 db_utils.py 和 import_data.py 中定义表结构和导入逻辑
+# search_column_name = "custom_term_column" # 自定义数据中用于搜索的列
+# keywords = ["随机自定义", "获取自定义"]
+# folder_name = "MyCustomDataFolder" # 'base_data_path' 下的文件夹
+# file_extensions = [".txt", ".csv"]
+# retry_attempts = 3
+# failure_message = "我的自定义数据现在不可用。"

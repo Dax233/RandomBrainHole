@@ -11,19 +11,32 @@ async def random_yuanxiao_info(table_name: str) -> str:
             logger.warning(f"{plugin_display_name}插件：无法从数据库表 {table_name} 获取词汇。")
             raise ValueError(f"无法从数据库表 {table_name} 获取词汇。")
 
-        # 数据库列名: term, pinyin, source_text, difficulty_liju, difficulty_naodong, definition
-        output = (
-            f"[{plugin_display_name}]\n"
-            f"{word_info.get('pinyin', '暂无')}\n"
-            f"{word_info.get('term', '暂无')}\n" # 对应原 '词汇'
-            f"出处：{word_info.get('source_text', '暂无')}\n"
-            f"丽句难度：{word_info.get('difficulty_liju', '暂无')}\n"
-            f"脑洞难度：{word_info.get('difficulty_naodong', '暂无')}\n"
-            f"解释：{word_info.get('definition', '暂无')}"
-        )
-        return output
+        # 复用下面的格式化逻辑
+        return await format_yuanxiao_data(word_info, is_search_result=False)
     except ValueError:
         raise
     except Exception as e:
-        logger.opt(exception=e).error(f"{plugin_display_name}插件：处理从数据库获取的信息时出错 (表: {table_name})。")
-        raise ValueError(f"{plugin_display_name}插件处理数据失败。")
+        logger.opt(exception=e).error(f"{plugin_display_name}插件：处理从数据库获取的随机信息时出错 (表: {table_name})。")
+        raise ValueError(f"{plugin_display_name}插件处理随机数据失败。")
+
+async def format_yuanxiao_data(word_info: Dict[str, Any], is_search_result: bool = True) -> str:
+    """
+    格式化给定的元晓词条信息。
+    :param word_info: 包含词条信息的字典。
+    :param is_search_result: 布尔值，指示这是否是查词结果，用于调整输出标题。
+    :return: 格式化后的字符串。
+    """
+    plugin_display_name = "元晓"
+    title_prefix = f"[{plugin_display_name}{' - 查词结果' if is_search_result else ''}]"
+
+    # 确保所有 get 调用都有默认值
+    output = (
+        f"{title_prefix}\n"
+        f"{word_info.get('pinyin', '拼音:暂无')}\n"
+        f"词汇: {word_info.get('term', '暂无')}\n"
+        f"出处：{word_info.get('source_text', '暂无')}\n"
+        f"丽句难度：{word_info.get('difficulty_liju', '暂无')}\n"
+        f"脑洞难度：{word_info.get('difficulty_naodong', '暂无')}\n"
+        f"解释：{word_info.get('definition', '暂无')}"
+    )
+    return output

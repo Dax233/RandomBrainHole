@@ -1,7 +1,12 @@
 import sqlite3
 from pathlib import Path
-from typing import Optional, Any, Dict, Tuple
+from typing import Optional, Any, Dict, Tuple, List # 新增 List
 from nonebot import logger # 导入 NoneBot 的 logger
+
+# 从同级目录的 config 模块导入配置相关的类和函数
+# 确保 PluginSetting 也被导入，如果它在 search_term_in_db 中作为类型提示使用
+from .config import get_plugin_config, PluginSetting, get_database_full_path
+
 
 # --- 表创建SQL语句 ---
 # (保留所有原有的词库表 CREATE TABLE 语句)
@@ -60,16 +65,15 @@ CREATE TABLE IF NOT EXISTS zhenxiu_terms (
     UNIQUE (term, source_file, source_sheet)
 );"""
 
-# 新增：用于记录已导入文件及其哈希值的表
 CREATE_IMPORTED_FILES_LOG_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS imported_files_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    file_identifier TEXT NOT NULL,             -- 文件的唯一标识 (例如，插件名 + 文件名 + 子表名)
-    file_hash TEXT NOT NULL,                   -- 文件的哈希值
-    last_imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- 最后导入或检查时间
-    status TEXT,                               -- 导入状态 (e.g., "imported", "skipped_unchanged")
-    plugin_type TEXT,                          -- 所属插件类型 (可选，用于区分)
-    UNIQUE (file_identifier)                   -- 文件标识唯一
+    file_identifier TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
+    last_imported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT,
+    plugin_type TEXT,
+    UNIQUE (file_identifier)
 );
 """
 
@@ -81,7 +85,7 @@ ALL_TABLE_SCHEMAS: Dict[str, str] = {
     "wuxing_terms": CREATE_WUXING_TABLE_SQL,
     "yuanxiao_terms": CREATE_YUANXIAO_TABLE_SQL,
     "zhenxiu_terms": CREATE_ZHENXIU_TABLE_SQL,
-    "imported_files_log": CREATE_IMPORTED_FILES_LOG_TABLE_SQL, # 添加新表
+    "imported_files_log": CREATE_IMPORTED_FILES_LOG_TABLE_SQL,
 }
 
 _connection: Optional[sqlite3.Connection] = None
@@ -91,7 +95,7 @@ def get_db_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     global _connection
     if _connection is None:
         if db_path is None:
-            from .config import get_database_full_path 
+            # from .config import get_database_full_path # 已在模块顶部导入
             actual_db_path = get_database_full_path()
         else:
             actual_db_path = db_path
@@ -117,7 +121,7 @@ def close_db_connection():
 
 def create_tables_if_not_exists(conn: Optional[sqlite3.Connection] = None):
     """检查并创建所有预定义的数据库表（如果它们尚不存在）。"""
-    is_temp_conn = False
+    # is_temp_conn = False # 此变量未使用，可以移除
     if conn is None:
         conn = get_db_connection()
     try:
@@ -133,7 +137,6 @@ def create_tables_if_not_exists(conn: Optional[sqlite3.Connection] = None):
              conn.rollback() 
         raise
 
-# --- 新增文件哈希记录相关函数 ---
 def get_last_imported_file_hash(conn: sqlite3.Connection, file_identifier: str) -> Optional[str]:
     """获取指定文件标识符最后记录的文件哈希值。"""
     cursor = conn.cursor()
@@ -176,7 +179,7 @@ async def get_random_entry_from_db(table_name: str) -> Optional[Dict[str, Any]]:
     try:
         conn = get_db_connection() 
         cursor = conn.cursor()
-        if table_name not in ALL_TABLE_SCHEMAS or table_name == "imported_files_log": # 不从日志表随机取
+        if table_name not in ALL_TABLE_SCHEMAS or table_name == "imported_files_log":
             logger.error(f"RandomBrainHole DB: 请求的表名 '{table_name}' 无效或不是数据表。")
             return None
         
@@ -196,3 +199,48 @@ async def get_random_entry_from_db(table_name: str) -> Optional[Dict[str, Any]]:
     except Exception as e: 
         logger.opt(exception=e).error(f"RandomBrainHole DB: 获取随机条目时发生未知错误 (表: {table_name})。")
         return None
+
+async def search_term_in_db(search_keyword: str) -> List[Tuple[PluginSetting, Dict[str, Any]]]:
+    """
+    在所有配置的插件表中搜索一个词条。
+    返回一个元组列表，每个元组包含 PluginSetting 和找到的数据行字典。
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    results: List[Tuple[PluginSetting, Dict[str, Any]]] = []
+    
+    config = get_plugin_config()
+    for plugin_setting in config.plugins:
+        table_name = plugin_setting.table_name
+        # search_column 来自 config.py 中 PluginSetting 的定义，有默认值 "term"
+        search_column = plugin_setting.search_column_name 
+
+        if not search_column: 
+            logger.warning(f"插件 {plugin_setting.name} (表: {table_name}) 未配置 search_column_name。跳过此表的搜索。")
+            continue
+        
+        # 注意：这里的SQL查询是区分大小写的（对于大多数SQLite配置）。如果需要不区分大小写，可以使用LOWER()或COLLATE NOCASE。
+        # 例如: f"SELECT * FROM {table_name} WHERE LOWER({search_column}) = LOWER(?)"
+        # 或者在创建表时为列指定 COLLATE NOCASE。
+        # 目前，我们使用精确匹配。
+        # 对于蝠汁牌的 full_text 搜索，如果需要模糊匹配，可以使用 LIKE。
+        # 例如: sql_query = f"SELECT * FROM {table_name} WHERE {search_column} LIKE ?"
+        #       query_params = (f"%{search_keyword}%",)
+        # 但当前配置 search_column_name 指向一个明确的列进行精确查找。
+        sql_query = f"SELECT * FROM {table_name} WHERE {search_column} = ?" # nosec B608
+        query_params = (search_keyword,)
+
+        try:
+            logger.debug(f"查词功能：正在表 '{table_name}' 的列 '{search_column}' 中搜索关键词 '{search_keyword}'")
+            cursor.execute(sql_query, query_params)
+            rows = cursor.fetchall() # fetchall() 返回一个列表的元组，sqlite3.Row使其可以像字典一样访问
+            for row_obj in rows:
+                results.append((plugin_setting, dict(row_obj))) # 将 sqlite3.Row 转换为普通字典
+        except sqlite3.Error as e:
+            logger.error(f"查词功能：在表 {table_name} 中搜索时发生错误: {e}")
+            
+    if not results:
+        logger.info(f"查词功能：未在任何配置的表中找到关键词 '{search_keyword}'。")
+    else:
+        logger.info(f"查词功能：为关键词 '{search_keyword}' 找到了 {len(results)} 条记录。")
+    return results
