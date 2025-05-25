@@ -162,14 +162,16 @@ async def _master_message_handler(bot: Bot, event: Event, matcher: Matcher):
         # 修正为：匹配 `[占位符]`，其中 `占位符` 是 `folder_names` 之一。
         # 使用 `re.escape` 来确保 `folder_name` 中的特殊字符被正确处理。
         # 占位符格式现在是 `[词库名]`，例如 `[脑洞]`
-        placeholder_pattern = r"\[(" + "|".join(re.escape(fn) for fn in folder_names) + r")\]"
+
+        # pattern = placeholder_pattern
+        pattern = placeholder_pattern_with_escape
 
         
         output_parts = [] # 用于存储最终输出字符串的各个部分
         last_end = 0 # 上一个匹配结束的位置
 
         # 使用 re.finditer 遍历模板字符串中所有匹配的占位符
-        for match in re.finditer(placeholder_pattern, template_string):
+        for match in re.finditer(pattern, template_string):
             start, end = match.span() # 获取匹配的开始和结束位置
             placeholder_name = match.group(1) # 获取捕获到的占位符名称 (不含方括号)
 
