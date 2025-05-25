@@ -17,6 +17,141 @@
 -   **灵活配置**：核心行为（如关键词、数据表名、处理函数等）均通过 `config.toml` 进行配置。
 -   **日志记录**：集成了 NoneBot 的日志系统，方便追踪插件运行状态和调试。
 
+## 📊 系统图表
+
+### 1. 整体流程图
+
+```mermaid
+graph TD
+    A[用户发送消息] --> B{NoneBot 接收};
+    B --> C[plugin_loader:_master_message_handler];
+    C --> D{消息类型判断};
+    D -- 查词 --> E[查词处理流程];
+    D -- 随机填词 --> F[随机填词处理流程];
+    D -- 关键词触发 --> G[关键词触发处理流程];
+    D -- 其他/不匹配 --> Z[结束/传递给其他插件];
+
+    subgraph E [查词处理流程]
+        E1[提取查词关键词] --> E2[db_utils:search_term_in_db];
+        E2 --> E3[从数据库获取匹配项];
+        E3 --> E4{有匹配项?};
+        E4 -- 是 --> E5[动态加载格式化函数];
+        E5 --> E6[调用格式化函数];
+        E6 --> E7[组合结果];
+        E4 -- 否 --> E8[发送未找到消息];
+    end
+
+    subgraph F [随机填词处理流程]
+        F1[提取模板字符串] --> F2[解析模板中的占位符];
+        F2 --> F3{循环处理每个占位符};
+        F3 -- 未转义占位符 --> F4[db_utils:get_random_entry_from_db];
+        F4 --> F5[从数据库获取随机词条];
+        F5 --> F6[替换占位符];
+        F3 -- 转义占位符 --> F7[保留原文本];
+        F3 -- 处理完毕 --> F8[组合结果];
+    end
+
+    subgraph G [关键词触发处理流程]
+        G1[遍历config中各插件关键词] --> G2{消息命中关键词?};
+        G2 -- 是 --> G3[动态加载信息处理函数];
+        G3 --> G4[db_utils:get_random_entry_from_db];
+        G4 --> G5[调用信息处理函数格式化];
+        G2 -- 否 --> Z;
+    end
+
+    E7 --> H[发送响应消息给用户];
+    E8 --> H;
+    F8 --> H;
+    G5 --> H;
+
+    subgraph Init [初始化流程]
+        I1[Bot启动] --> I2[__init__.py];
+        I2 --> I3[加载config.toml];
+        I2 --> I4[注册数据库初始化钩子];
+        I4 --> I5[db_utils:create_tables_if_not_exists];
+        I2 --> I6[plugin_loader:create_plugin_handlers];
+    end
+
+    subgraph DataImport [数据导入流程 - 手动执行 import_data 脚本]
+        J1[运行 import_data.py] --> J2[读取 config.toml];
+        J2 --> J3[扫描 base_data_path 下各插件的 folder_name];
+        J3 --> J4[遍历数据文件];
+        J4 --> J5{文件哈希检查};
+        J5 -- 新文件/已更改 --> J6[调用对应解析函数];
+        J6 --> J7["用户确认 (示例数据)"];
+        J7 -- 确认 --> J8[db_utils:insert_data_to_db];
+        J8 --> J9[更新 imported_files_log];
+        J5 -- 未更改 --> J10[跳过];
+    end
+```
+
+### 2. 数据流图
+
+```mermaid
+graph LR
+    U[用户]
+
+    subgraph DataSource [数据源文件]
+        direction LR
+        Excel[词库.xlsx]
+        Word[词库.docx]
+    end
+
+    subgraph ImportProcess [数据导入脚本: import_data.py]
+        direction TB
+        IP1[读取 config.toml中base_data_path, folder_name]
+        IP2["文件解析器 (parse_*.py)"]
+        IP3[数据哈希与比较]
+        IP4[数据插入逻辑]
+    end
+
+    subgraph ConfigFiles [配置文件]
+        direction TB
+        CFG[config.toml]
+    end
+
+    subgraph Database [SQLite数据库: random_brainhole_data.db]
+        direction TB
+        DB_Tables["词库数据表 (e.g., brainhole_terms)"]
+        DB_Log["imported_files_log 表"]
+    end
+
+    subgraph PluginCore [RandomBrainHole 核心逻辑]
+        direction TB
+        PC_Init["__init__.py: 初始化, 加载配置"]
+        PC_Loader["plugin_loader.py: 消息处理与分发"]
+        PC_DBUtils["db_utils.py: 数据库交互"]
+        PC_Plugins["plugins/*.py: 具体词库逻辑/格式化"]
+    end
+
+    subgraph BotPlatform [NoneBot & OneBot]
+        direction TB
+        NB[NoneBot2 框架]
+        OB[OneBot V11 适配器]
+    end
+
+    DataSource -->|1. 手动放置| IP1
+    CFG -->|2. 读取配置| IP1
+    IP1 -->|3. 定位文件| IP2
+    IP2 -->|4. 解析后数据| IP4
+    IP3 -->|5. 文件是否更改| IP2
+    IP4 -->|6. 写入数据/日志| Database
+
+    U -- 7. 发送消息 --> OB
+    OB -- 8. 传递事件 --> NB
+    NB -- 9. 分发给插件 --> PC_Init
+    PC_Init -- 10. 加载配置 --> CFG
+    PC_Init -- 11. 触发消息处理 --> PC_Loader
+    PC_Loader -- 12. 请求数据 --> PC_DBUtils
+    PC_DBUtils -- 13. 读/写 --> Database
+    PC_DBUtils -- 14. 返回数据 --> PC_Loader
+    PC_Loader -- 15. 调用具体插件逻辑 --> PC_Plugins
+    PC_Plugins -- 16. 格式化数据 --> PC_Loader
+    PC_Loader -- 17. 准备响应 --> NB
+    NB -- 18. 通过适配器发送 --> OB
+    OB -- 19. 响应消息 --> U
+```
+
 ## 🚀 环境要求
 
 -   Python >= 3.9
