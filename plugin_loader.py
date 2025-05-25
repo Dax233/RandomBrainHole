@@ -114,134 +114,87 @@ async def _master_message_handler(bot: Bot, event: Event, matcher: Matcher):
              await matcher.send(f"找到了“{search_keyword}”的相关条目，但在格式化输出时发生问题。")
         return # "查词" 命令处理完毕，直接返回
 
-    # --- 2. 新增：处理 "随机填词" 命令 ---
-    # 检查消息是否以 "随机填词 " 开头
+    # --- 2. 处理 "随机填词" 命令 ---
     FILL_WORD_COMMAND_PREFIX = "随机填词 "
     if message_text.startswith(FILL_WORD_COMMAND_PREFIX):
-        template_string = message_text[len(FILL_WORD_COMMAND_PREFIX):].strip() # 提取模板字符串
+        template_string = message_text[len(FILL_WORD_COMMAND_PREFIX):].strip()
         if not template_string:
-            await matcher.send("请输入需要填词的文本，例如：随机填词 今天天气[脑洞]，心情[拼释]。")
+            await matcher.send("请输入需要填词的文本，例如：随机填词 今天天气真脑洞，心情有点\拼释。") # 更新示例
             return
 
         logger.info(f"RandomBrainHole (MasterHandler): 收到随机填词指令，模板: '{template_string}'")
 
-        # 构建 folder_name 到 PluginSetting 的映射，以及所有 folder_name 的列表
-        # folder_name 在 config.toml 中定义，用作占位符的名称
         folder_name_to_plugin: Dict[str, PluginSetting] = {}
         folder_names: List[str] = []
-        for ps_config in current_config.plugins: # 遍历所有插件配置
-            if ps_config.folder_name: # 确保 folder_name 存在且不为空
+        for ps_config in current_config.plugins:
+            if ps_config.folder_name:
                 folder_name_to_plugin[ps_config.folder_name] = ps_config
                 folder_names.append(ps_config.folder_name)
         
-        if not folder_names: # 如果没有任何插件定义了 folder_name
+        if not folder_names:
             logger.warning("随机填词：配置文件中没有任何插件定义了 folder_name，无法进行填词。")
             await matcher.send("抱歉，我还没有学会任何词库的占位符，无法进行填词。")
             return
 
-        # 对 folder_names 按长度降序排序，目的是优先匹配更长的占位符
-        # 例如，如果同时有 "天气" 和 "天气预报" 作为占位符，优先匹配 "天气预报"
-        folder_names.sort(key=len, reverse=True)
+        folder_names.sort(key=len, reverse=True) # 优先匹配更长的 folder_name
 
-        # 构建正则表达式，用于从模板字符串中匹配占位符。
-        # 格式: (\?)(folder_name1|folder_name2|...)
-        #   \\? : 匹配一个可选的前导反斜杠 (用于转义，例如 \[脑洞] 表示不替换 "[脑洞]")
-        #   (folder_name1|folder_name2|...) : 匹配任何一个已定义的 folder_name
-        #   re.escape() : 用于转义 folder_name 中的特殊正则表达式字符 (例如 '.')
-        placeholder_pattern = r"\[(" + "|".join(re.escape(fn) for fn in folder_names) + r")\]"
-        # 修改后的模式：匹配 [占位符名称]，并捕获占位符名称
-        # 例如，如果 folder_names 是 ["脑洞", "拼释"]，则模式是 r"\[(脑洞|拼释)\]"
-        # 如果用户输入 "\[脑洞]"，则不应该被替换。
-        # 我们需要一个更复杂的模式来处理转义，或者在匹配后检查前一个字符。
-        # 简单起见，我们先用一个能匹配 `[占位符]` 的模式，然后通过 `plugin_setting.search_column_name` 获取词。
-        # 修正后的占位符模式，允许用户使用 `\[占位符]` 来避免替换
-        # (\\?)\[(folder_name1|folder_name2|...)\]
-        # 第一个捕获组 (\\?) 是可选的反斜杠
-        # 第二个捕获组是占位符名称
-        placeholder_pattern_with_escape = r"(\\?)\\[(" + "|".join(re.escape(fn) for fn in folder_names) + r")\\]"
-        # 修正为：匹配 `[占位符]`，其中 `占位符` 是 `folder_names` 之一。
-        # 使用 `re.escape` 来确保 `folder_name` 中的特殊字符被正确处理。
-        # 占位符格式现在是 `[词库名]`，例如 `[脑洞]`
-
-        # pattern = placeholder_pattern
-        pattern = placeholder_pattern_with_escape
-
+        # 新的正则表达式：
+        # (\\?) : 捕获组1，匹配一个可选的反斜杠（用于转义）
+        # (...) : 捕获组2，匹配任何一个 folder_name
+        # re.escape(fn) 确保 folder_name 中的特殊字符被正确转义
+        placeholder_pattern = r"(\\?)(" + "|".join(re.escape(fn) for fn in folder_names) + r")"
         
-        output_parts = [] # 用于存储最终输出字符串的各个部分
-        last_end = 0 # 上一个匹配结束的位置
+        output_parts = []
+        last_end = 0
+        placeholder_found_and_replaced = False # 标记是否至少替换了一个占位符
+        has_valid_placeholder_syntax = False # 标记模板中是否至少有一个看起来像占位符的语法
 
-        # 使用 re.finditer 遍历模板字符串中所有匹配的占位符
-        for match in re.finditer(pattern, template_string):
-            start, end = match.span() # 获取匹配的开始和结束位置
-            placeholder_name = match.group(1) # 获取捕获到的占位符名称 (不含方括号)
+        for match in re.finditer(placeholder_pattern, template_string):
+            start, end = match.span()
+            escaped_char, placeholder_name = match.groups() # escaped_char 是捕获组1, placeholder_name 是捕获组2
+            has_valid_placeholder_syntax = True # 只要匹配到模式，就认为有占位符语法
 
-            # 添加占位符之前的部分
-            output_parts.append(template_string[last_end:start])
-            
-            # 检查占位符前是否有转义符 '\'
-            # 注意：上面的 placeholder_pattern 没有直接处理转义。
-            # 一个更健壮的方法是使用更复杂的正则表达式，或者在找到匹配后检查前一个字符。
-            # 假设我们约定 `\[词库名]` 表示不替换。
-            # 这里的逻辑需要调整以正确处理转义。
-            # 当前的 placeholder_pattern `r"\[(folder_name1|...)]"` 会直接匹配 `[脑洞]`
-            # 如果用户输入 `\[脑洞]`，它不会被这个 pattern 匹配。
-            # 如果用户输入 `\[脑洞]`，我们希望它输出 `[脑洞]` 而不是替换。
-            # 让我们重新思考转义。如果用户输入 `\[脑洞]`，它应该被视为普通文本。
-            # 如果用户输入 `[脑洞]`，它应该被替换。
+            output_parts.append(template_string[last_end:start]) # 添加匹配前的部分
 
-            # 简化逻辑：如果 template_string[start-1] == '\\' and start > 0，则认为是转义。
-            # 但这要求 placeholder_pattern 本身不包含反斜杠。
-            # 让我们坚持使用 `[词库名]` 作为占位符。转义可以通过 `\[词库名]` 实现，
-            # 但当前的 `placeholder_pattern` 不会匹配 `\[`。
-            # 所以，如果匹配到了，说明它不是转义的。
-
-            plugin_setting = folder_name_to_plugin.get(placeholder_name)
-            if plugin_setting:
-                # 从数据库中随机获取一个条目
-                random_entry = await get_random_entry_from_db(plugin_setting.table_name)
-                if random_entry:
-                    # 使用配置中定义的 search_column_name (通常是 'term') 作为填入的词
-                    fill_word = random_entry.get(plugin_setting.search_column_name)
-                    if fill_word:
-                        output_parts.append(str(fill_word)) # 添加替换后的词
-                        logger.debug(f"随机填词：用 '{fill_word}' 替换了占位符 '[{placeholder_name}]' (来自表 '{plugin_setting.table_name}')")
+            if escaped_char: # 如果存在转义符 '\'
+                output_parts.append(placeholder_name) # 直接添加 folder_name，去除转义符
+                logger.debug(f"随机填词：跳过转义的占位符 '{placeholder_name}'")
+            else: # 没有转义符，是正常的占位符
+                plugin_setting = folder_name_to_plugin.get(placeholder_name)
+                # plugin_setting 理论上一定能找到，因为 pattern 是基于 folder_names 构建的
+                if plugin_setting:
+                    random_entry = await get_random_entry_from_db(plugin_setting.table_name)
+                    if random_entry:
+                        fill_word = random_entry.get(plugin_setting.search_column_name)
+                        if fill_word:
+                            output_parts.append(str(fill_word))
+                            placeholder_found_and_replaced = True # 成功替换
+                            logger.debug(f"随机填词：用 '{fill_word}' 替换了占位符 '{placeholder_name}' (来自表 '{plugin_setting.table_name}')")
+                        else:
+                            output_parts.append(placeholder_name + "?") # 获取词失败，标记
+                            logger.warning(f"随机填词：无法从表 '{plugin_setting.table_name}' 的 '{plugin_setting.search_column_name}' 列获取词用于占位符 '{placeholder_name}'")
                     else:
-                        output_parts.append(f"[{placeholder_name}?]") # 获取词失败，保留占位符并标记
-                        logger.warning(f"随机填词：无法从表 '{plugin_setting.table_name}' 的 '{plugin_setting.search_column_name}' 列获取词用于占位符 '[{placeholder_name}]'")
-                else:
-                    output_parts.append(f"[{placeholder_name}空]") # 表中无数据或获取失败，保留占位符并标记
-                    logger.warning(f"随机填词：无法从表 '{plugin_setting.table_name}' 获取随机条目用于占位符 '[{placeholder_name}]'")
-            else:
-                # 理论上不应该发生，因为 placeholder_pattern 是基于 folder_names 构建的
-                output_parts.append(f"[{placeholder_name}]") # 保留未识别的占位符
-            
-            last_end = end # 更新上一个匹配结束的位置
+                        output_parts.append(placeholder_name + "空") # 表中无数据，标记
+                        logger.warning(f"随机填词：无法从表 '{plugin_setting.table_name}' 获取随机条目用于占位符 '{placeholder_name}'")
+                else: 
+                    # 理论上不会到这里
+                    output_parts.append(placeholder_name)
+            last_end = end
         
-        output_parts.append(template_string[last_end:]) # 添加最后一个占位符之后的部分
-        output_string = "".join(output_parts) # 拼接所有部分得到最终结果
+        output_parts.append(template_string[last_end:])
+        output_string = "".join(output_parts)
 
-        # 只有当字符串发生改变时才发送结果，或者如果原始文本中就没有有效占位符，则发送提示
-        if output_string != template_string : 
+        if placeholder_found_and_replaced: # 如果至少有一个占位符被成功替换
              await matcher.send(output_string)
-        # elif not re.search(placeholder_pattern, template_string): # 如果原始文本中没有有效的占位符
-        #     # 改进提示，告知用户如何使用占位符
-        #     example_placeholder = folder_names[0] if folder_names else "词库名"
-        #     await matcher.send(f"请在文本中使用方括号括起来的词库名作为占位符，例如：随机填词 今天天气[{example_placeholder}]。\n可用的词库占位符有：{', '.join(f'[{fn}]' for fn in folder_names)}")
-        else: # 如果没有发生替换 (例如所有占位符都获取失败，或者根本没有占位符)
-            # 如果原始字符串中就没有我们定义的占位符，可以给用户一个提示
-            # 检查原始模板中是否有任何看起来像占位符的模式，但不是我们定义的
-            has_potential_placeholders = any(f"[{fn}]" in template_string for fn in folder_names)
-            if not has_potential_placeholders and "[" in template_string and "]" in template_string:
-                 await matcher.send(f"看起来您想使用填词功能，但没有找到我认识的词库占位符。请使用以下格式：[{folder_names[0] if folder_names else '词库名'}]。\n我认识的词库有：{', '.join(folder_names)}")
-            elif not has_potential_placeholders: # 既没有我们的占位符，也没有其他方括号
-                await matcher.send(f"请输入带有词库占位符的文本才能进行填词哦！例如：随机填词 今天天气[{folder_names[0] if folder_names else '词库名'}]。")
-            else: # 有我们的占位符，但是替换失败了，或者用户输入的就是替换后的结果
-                 await matcher.send(output_string) # 此时 output_string 等于 template_string
-
+        elif has_valid_placeholder_syntax and not placeholder_found_and_replaced : # 有占位符语法，但一个都没成功替换（可能都转义了或都获取失败）
+            await matcher.send(output_string) # 发送处理转义或标记失败后的结果
+        else: # 模板中完全没有匹配到任何定义的 folder_name 作为占位符
+            example_placeholder = folder_names[0] if folder_names else "词库名"
+            await matcher.send(f"请在文本中使用词库名作为占位符，例如：随机填词 今天天气真{example_placeholder}。\n使用 \\{example_placeholder} 可以避免替换。\n我认识的词库占位符有：{', '.join(folder_names)}")
         return # "随机填词" 命令处理完毕
 
+
     # --- 3. 处理关键词触发的随机信息获取 (原有逻辑) ---
-    # 遍历配置文件中定义的每个插件
     for plugin_setting in current_config.plugins:
         triggered_keyword: Optional[str] = None
         # 检查消息文本是否包含插件定义的任何关键词
@@ -310,22 +263,11 @@ def create_plugin_handlers():
     """
     logger.info("RandomBrainHole (PluginLoader): 正在创建 on_message 主处理器...")
     
-    # 创建一个 on_message 类型的事件响应器
-    # priority=0: 优先级，数字越小优先级越高
-    # block=False: 非阻塞模式，即此处理器处理完后，消息还会继续传递给其他低优先级的处理器 (如果适用)
     master_matcher = on_message(
         priority=0, 
-        block=False # 设置为 False 允许其他插件也有机会处理消息，除非此处理器显式 block
-                    # 如果希望此插件处理后不再让其他插件处理，可以考虑在 _master_message_handler 内部
-                    # 根据情况调用 matcher.stop_propagation() 或将 block 设为 True (如果适用)
-                    # 但对于通用关键词触发，通常 block=False 是合适的，除非关键词非常特定。
-                    # 对于明确的命令如 "查词"、"随机填词"，如果处理了，通常应该阻止后续传播。
-                    # 可以在 _master_message_handler 的 "查词" 和 "随机填词" 分支的 return 前加上 matcher.stop_propagation()
-                    # 或者，如果这些命令非常独特，可以将 block 设为 True，并确保这个 matcher 的 priority 足够高。
-                    # 考虑到这是一个多功能插件，block=False 配合内部逻辑判断是否 return (从而隐式结束处理) 是一个灵活的方式。
+        block=False
     )
     
-    # 将 _master_message_handler 注册为该响应器的处理函数
     master_matcher.handle()(_master_message_handler)
     
     logger.info(f"RandomBrainHole (PluginLoader): on_message 主处理器已注册，优先级0，非阻塞模式。")
