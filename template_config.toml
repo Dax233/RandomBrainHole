@@ -3,116 +3,83 @@
 
 # (可选) 您的数据文件（如 Excel、Word 文档）的基础存储路径。
 # 这个配置主要由 import_data.py 脚本使用。
-# 如果是相对路径，它通常相对于 import_data.py 脚本的运行位置，
-# 或者由脚本内部的路径解析逻辑处理。
-# 建议使用绝对路径，或相对于插件根目录的路径。
-# 示例: base_data_path = "src/data/randomND"
-# 示例: base_data_path = "data/" # (如果 'data' 文件夹位于插件根目录下)
+# 请务必修改成你自己的路径，否则数据导入会失败哦！
+# 示例: base_data_path = "data/"
 base_data_path = "your/base/data/path/"
 
 # SQLite 数据库文件的路径。
 # 如果是相对路径，将在插件的根目录下创建或查找。
-# 示例: database_path = "database/random_brainhole_data.db"
 database_path = "database/random_brainhole_data.db"
 
+# (可选) 全局代理配置
+# 如果不需要，请保持注释状态或直接删除这两行。
+# proxy_host = "127.0.0.1"
+# proxy_port = 7890
+
+
+# --- 造词功能配置 [新功能！] ---
+[word_generator]
+# 是否开启这个功能
+enabled = true
+
+# 用哪个LLM模型来鉴定
+llm_model_name = "deepseek-v3"
+
+# LLM的入口地址
+llm_base_url = "https://api.siliconflow.cn/v1"
+
+# [必须填写!] 在这里填入你的API密钥，可以填很多个哦！
+# 示例: llm_api_keys = ["sk-key1", "sk-key2"]
+llm_api_keys = []
+
+# 一次性塞给LLM多少个组合让它品尝？建议不要太大，它会累坏的。
+max_combinations_per_request = 100
+
+# [可选] 各个长度的生成概率，加起来最好等于1哦
+[word_generator.generation_probabilities]
+"2" = 0.80  # 80%的概率生成两个字的组合
+"4" = 0.15  # 15%的概率生成四个字的组合
+"3" = 0.05  # 5%的概率生成三个字的组合
+
+
+# --- 插件配置列表 ---
 # [[plugins]] 标记一个插件配置块的开始。
 # 您可以为不同的功能定义多个 [[plugins]] 配置块。
 
 [[plugins]]
-# 插件模块的友好名称 (例如："我的脑洞合集")。
+# 插件模块的友好名称
 name = "示例脑洞"
-
-# 位于 'plugins' 子文件夹中的 Python 模块名称 (不含 .py 后缀的文件名)。
-# 例如: 如果您的插件文件是 'RandomBrainHole/plugins/my_plugin.py', 则 module_name = "my_plugin"
-module_name = "brainhole" # 对应 RandomBrainHole/plugins/brainhole.py
-
-# 'module_name' 指定的模块内的异步函数名称。
-# 当触发关键词时，此函数将被调用以获取随机条目。
-# 此函数应接受 'table_name' (str) 作为参数，并返回一个格式化后的字符串。
+# 位于 'plugins' 子文件夹中的 Python 模块名称 (不含 .py 后缀)
+module_name = "brainhole"
+# 随机获取信息时调用的函数名
 info_function_name = "random_brainhole_info"
-
-# 'module_name' 指定的模块内的异步函数名称。
-# 当使用 "查词" 命令找到特定条目时，此函数将被调用以格式化该条目。
-# 此函数应接受 'word_info' (dict) 和 'is_search_result' (bool) 
-# 作为参数，并返回一个格式化后的字符串。
+# “查词”时用于格式化输出的函数名
 format_function_name = "format_brainhole_data"
-
-# 与此插件关联的数据库表名。
-# 此表将存储为此插件导入的数据。
+# 关联的数据库表名
 table_name = "brainhole_terms"
-
-# 'table_name' 指定的表中的列名。
-# 当为此插件使用 "查词" 命令时，将在此列中搜索。
-# 如果在 config.py 的 Pydantic 模型中未指定，则默认为 "term"，
-# 但在此处明确指定是个好习惯。
+# “查词”时搜索的列名
 search_column_name = "term"
-
-# 触发此插件的关键词列表。
-# 如果消息中包含这些关键词中的任何一个，则会调用 'info_function_name'。
+# 触发关键词
 keywords = ["随机脑洞", "脑洞一下", "示例脑洞"]
-
-# 数据文件所在文件夹的名称（相对于 'base_data_path'）。
-# 此配置由 import_data.py 脚本使用。
-# 例如: 如果 base_data_path = "data/" 且您的脑洞文件位于 "data/my_brainholes/",
-# 则 folder_name = "my_brainholes"
-# 随机填词将采用该项的值进行填写
-folder_name = "脑洞" # 对应 'base_data_path' 下的子文件夹
-
-# 应为此插件处理的数据文件的扩展名列表。
-# 由 import_data.py 脚本使用。(例如: [".xlsx", ".csv"])
+# 数据文件所在文件夹的名称 (相对于 'base_data_path')
+# “随机填词”功能也会使用这个名字作为占位符哦！
+folder_name = "脑洞"
+# 数据文件的扩展名
 file_extensions = [".xlsx"]
-
-# 如果调用 'info_function_name' 失败（例如数据库错误、无数据），则重试的次数。
+# 失败重试次数
 retry_attempts = 2
-
-# 如果所有重试尝试均失败，则发送给用户的消息。
+# 最终失败时发送的消息
 failure_message = "今天脑洞枯竭了，过会儿再来吧！"
 
-# --- 其他插件配置示例 ---
+# --- 其他插件配置示例 (保持不变) ---
 # [[plugins]]
 # name = "示例拼释"
-# module_name = "pinshi" # 假设您有 RandomBrainHole/plugins/pinshi.py
-# info_function_name = "random_pinshi_info"
-# format_function_name = "format_pinshi_data"
-# table_name = "pinshi_terms"
-# search_column_name = "term" # 或者 'pinshi_terms' 表中用于搜索的列名
-# keywords = ["随机拼释", "来个拼释", "示例拼释"]
-# folder_name = "拼释" # 'base_data_path' 下的子文件夹
-# file_extensions = [".xlsx"]
-# retry_attempts = 2
-# failure_message = "拼释词库今天有点害羞，不肯出来。"
+# module_name = "pinshi"
+# ... (其他配置)
 
-# --- 蝠汁牌插件配置示例 ---
 # [[plugins]]
 # name = "蝠汁牌"
 # module_name = "fuzhipai"
-# info_function_name = "random_fuzhipai_info"
-# format_function_name = "format_fuzhipai_data"
-# table_name = "fuzhipai_cards"
-# # 对于蝠汁牌，您可能希望按 'card_title' (卡牌标题) 或 'full_text' (完整文本) 搜索。
-# # 如果搜索 'full_text'，请考虑是否需要模糊匹配 (SQL中的 LIKE) 而非精确匹配。
-# # 当前 "查词" 功能的实现是精确匹配。
-# search_column_name = "card_title" # 示例：按卡牌标题搜索
-# keywords = ["随机蝠汁牌", "一张蝠汁牌"]
-# folder_name = "蝠汁牌"
-# file_extensions = [".docx"]
-# retry_attempts = 1
-# failure_message = "没抽到蝠汁牌，下次一定！"
+# ... (其他配置)
 
-# 为其他数据类型（如 随蓝, 五行, 元晓, 祯休等）添加更多的 [[plugins]] 配置块。
-# 确保为每个插件正确设置 'module_name', 'info_function_name', 'format_function_name', 
-# 'table_name', 'search_column_name', 'folder_name', 和 'keywords'。
-
-# --- 通用插件配置示例 ---
-# [[plugins]]
-# name = "我的自定义数据"
-# module_name = "my_custom_plugin" # 创建 RandomBrainHole/plugins/my_custom_plugin.py
-# info_function_name = "get_random_custom_data" # 在 my_custom_plugin.py 中实现此函数
-# format_function_name = "format_custom_data_entry" # 为搜索结果实现此函数
-# table_name = "my_custom_table" # 在 db_utils.py 和 import_data.py 中定义表结构和导入逻辑
-# search_column_name = "custom_term_column" # 自定义数据中用于搜索的列
-# keywords = ["随机自定义", "获取自定义"]
-# folder_name = "MyCustomDataFolder" # 'base_data_path' 下的文件夹
-# file_extensions = [".txt", ".csv"]
-# retry_attempts = 3
-# failure_message = "我的自定义数据现在不可用。"
+# ... 您可以继续在这里添加更多 [[plugins]] 配置块 ...

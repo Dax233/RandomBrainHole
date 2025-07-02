@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any
 from nonebot import logger
-from ..db_utils import get_random_entry_from_db # 从上一级目录的 db_utils 导入
+from ..db_utils import get_random_entry_from_db  # 从上一级目录的 db_utils 导入
+
 
 # --- 随机信息获取函数 ---
 async def random_yuanxiao_info(table_name: str) -> str:
@@ -12,12 +13,14 @@ async def random_yuanxiao_info(table_name: str) -> str:
     :raises ValueError: 如果无法从数据库获取词汇，或者处理数据时发生错误。
     :return: 格式化后的元晓信息字符串。
     """
-    plugin_display_name = "元晓" # 用于日志
+    plugin_display_name = "元晓"  # 用于日志
     try:
         # 从数据库随机获取一条记录
         word_info: Optional[Dict[str, Any]] = await get_random_entry_from_db(table_name)
-        if not word_info: # 如果未获取到数据
-            logger.warning(f"{plugin_display_name}插件：无法从数据库表 {table_name} 获取词汇。")
+        if not word_info:  # 如果未获取到数据
+            logger.warning(
+                f"{plugin_display_name}插件：无法从数据库表 {table_name} 获取词汇。"
+            )
             raise ValueError(f"无法从数据库表 {table_name} 获取词汇。")
 
         # 复用格式化函数
@@ -25,18 +28,23 @@ async def random_yuanxiao_info(table_name: str) -> str:
     except ValueError:
         raise
     except Exception as e:
-        logger.opt(exception=e).error(f"{plugin_display_name}插件：处理从数据库获取的随机信息时出错 (表: {table_name})。")
+        logger.opt(exception=e).error(
+            f"{plugin_display_name}插件：处理从数据库获取的随机信息时出错 (表: {table_name})。"
+        )
         raise ValueError(f"{plugin_display_name}插件处理随机数据失败。")
 
+
 # --- 数据格式化函数 ---
-async def format_yuanxiao_data(word_info: Dict[str, Any], is_search_result: bool = True) -> str:
+async def format_yuanxiao_data(
+    word_info: Dict[str, Any], is_search_result: bool = True
+) -> str:
     """
     格式化给定的元晓词条信息字典。
     元晓词条有特定的难度字段，如“丽句难度”和“脑洞难度”。
 
     :param word_info: 包含词条信息的字典。
                       期望包含的键如: 'pinyin', 'term' (词汇), 'source_text' (出处),
-                                     'difficulty_liju' (丽句难度), 
+                                     'difficulty_liju' (丽句难度),
                                      'difficulty_naodong' (脑洞难度), 'definition' (解释)。
     :param is_search_result: 布尔值，指示此调用是否来自查词功能。
     :return: 格式化后的字符串。
@@ -48,7 +56,7 @@ async def format_yuanxiao_data(word_info: Dict[str, Any], is_search_result: bool
     output = (
         f"{title_prefix}\n"
         f"{word_info.get('pinyin', '拼音:暂无')}\n"
-        f"词汇: {word_info.get('term', '暂无')}\n" # 'term' 在元晓中对应“词汇”
+        f"词汇: {word_info.get('term', '暂无')}\n"  # 'term' 在元晓中对应“词汇”
         f"出处：{word_info.get('source_text', '暂无')}\n"
         f"丽句难度：{word_info.get('difficulty_liju', '暂无')}\n"
         f"脑洞难度：{word_info.get('difficulty_naodong', '暂无')}\n"
