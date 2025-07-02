@@ -35,6 +35,8 @@ llm_api_keys = []
 # 一次性塞给LLM多少个组合让它品尝？建议不要太大，它会累坏的。
 max_combinations_per_request = 100
 
+character_source_strategy = "common"   # 从何处取字？可选值: "db", "common", "full"
+
 # [可选] 各个长度的生成概率，加起来最好等于1哦
 [word_generator.generation_probabilities]
 "2" = 0.80  # 80%的概率生成两个字的组合

@@ -1,5 +1,6 @@
 import sqlite3
 import hashlib
+import asyncio
 from pathlib import Path
 import pandas as pd  # 用于解析 Excel 文件
 from docx import Document  # 用于解析 Word (.docx) 文件
@@ -657,7 +658,7 @@ def insert_data_to_db(
 
 
 # --- 主逻辑 ---
-def main():
+async def main():
     """
     数据导入脚本的主函数。
     负责加载配置、连接数据库、创建表、遍历配置文件中定义的插件、
@@ -853,5 +854,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # 当此脚本被直接执行时，调用 main 函数
-    main()
+    asyncio.run(main())

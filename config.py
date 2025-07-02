@@ -23,13 +23,14 @@ class PluginSetting(BaseModel):
 # 造词功能的专属配置模型 (已更新，包含了LLM的所有配置)
 class WordGeneratorSetting(BaseModel):
     enabled: bool = True
-    llm_model_name: str = "deepseek-v2"
+    llm_model_name: str = "deepseek-v3"
     llm_base_url: str = "https://api.siliconflow.cn/v1"  # LLM的入口地址
     llm_api_keys: List[str] = Field(default_factory=list)  # 用来捅穿LLM的钥匙们！
     max_combinations_per_request: int = 100
     generation_probabilities: Dict[str, float] = Field(
         default_factory=lambda: {"2": 0.80, "4": 0.15, "3": 0.05}
     )
+    character_source_strategy: str = "full"  # 可选值: "db", "common", "full"
 
 
 # 主配置模型 (已更新，加入了代理配置)

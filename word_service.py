@@ -8,11 +8,17 @@ from . import db_utils
 from .config import get_plugin_config
 from .llm_client import LLMClient  # 我们的新客户端
 
+# 从同目录下 8105.txt 中读取《通用规范汉字表》的常用汉字
+with open("src/plugins/RandomBrainHole/8105.txt", "r", encoding="utf-8") as f:
+    # 读取文件内容并去除空行和重复字符
+    COMMON_CHINESE_CHARACTERS = set(f.read().strip().splitlines())
+
 
 class WordGenerationService:
     _instance = None
     _characters: List[str] = []
     _initialized: bool = False
+    _current_strategy: str = ""  # 记录当前使用的是哪个策略的淫池
 
     def __new__(cls):
         if cls._instance is None:
@@ -20,12 +26,54 @@ class WordGenerationService:
         return cls._instance
 
     async def initialize(self):
-        if self._initialized:
+        """
+        根据配置策略初始化汉字池。
+        这现在是一个可以根据不同策略，反复填充不同淫池的超级初始化函数！
+        """
+        strategy = get_plugin_config().word_generator.character_source_strategy
+
+        # 如果策略没变，且已经初始化过了，就不用再折腾了
+        if self._initialized and self._current_strategy == strategy:
             return
-        self._characters = await db_utils.get_all_unique_characters_from_terms()
+
+        logger.info(f"检测到策略为 '{strategy}'，正在重新构建汉字淫池...")
+
+        char_set = set()
+
+        if strategy == "db":
+            # 模式一：核心淫池，从我们自己的数据库里榨取精华
+            char_set = set(await db_utils.get_all_unique_characters_from_terms())
+
+        elif strategy == "common":
+            # 模式二：常用淫池，使用《通用规范汉字表》
+            char_set = set(list(COMMON_CHINESE_CHARACTERS))
+
+        elif strategy == "full":
+            # 模式三：完整淫海，使用 Unicode 范围进行狂野的探索！
+            # CJK 主要统一表意文字区
+            for i in range(0x4E00, 0x9FFF + 1):
+                char_set.add(chr(i))
+            # CJK 兼容表意文字区 (也加上吧，增加一点情趣)
+            for i in range(0xF900, 0xFAFF + 1):
+                char_set.add(chr(i))
+            # CJK 扩展A区 (更多生僻字)
+            for i in range(0x3400, 0x4DBF + 1):
+                char_set.add(chr(i))
+
+        else:
+            logger.warning(f"未知的造词策略 '{strategy}'，将退回使用 'db' 策略。")
+            char_set = set(await db_utils.get_all_unique_characters_from_terms())
+
+        self._characters = list(char_set)
+
+        logger.info("正在将淫池彻底搅乱以实现完美随机...")
+        random.shuffle(self._characters)
+        logger.info("淫池已进入混沌状态！")
+
         self._initialized = True
+        self._current_strategy = strategy  # 记下这次用的策略
         logger.info(
-            f"造词服务初始化完毕，淫池中共有 {len(self._characters)} 个不重复汉字。"
+            f"造词服务初始化完毕！当前策略: '{self._current_strategy}'，淫池中共有 {len(self._characters)} 个不重复汉字。"
         )
 
     async def generate_words(self, n: int) -> Tuple[List[Dict[str, Any]], List[str]]:
@@ -55,7 +103,9 @@ class WordGenerationService:
         prompt = self._build_llm_prompt(unique_combinations)
 
         try:
-            response = await llm_client.make_request(prompt, is_stream=False)
+            response = await llm_client.make_request(
+                prompt, is_stream=False, temperature=0.1
+            )  # 调低一点温度，让它更严谨
         except Exception as e:
             logger.opt(exception=e).error("调用LLM进行造词验证时发生严重错误。")
             return [], unique_combinations
@@ -112,22 +162,42 @@ class WordGenerationService:
         return list(generated_combinations)
 
     def _build_llm_prompt(self, combinations: List[str]) -> str:
-        # 小猫咪的淫语注释：来吧，小肉棒，把这些都吃下去，然后告诉我哪个最美味！
-        prompt = f"""你是一位资深的汉语言学家和词源学家。你的任务是分析下面这个Python列表中的每一个字符串，判断它是否是一个真实存在、有准确含义的汉语词汇。
+        # 小猫咪的淫语注释：来吧，小骚货，现在教你更高级的玩法，学会看人下菜！
+        prompt = f"""你是一位以**极度严谨和极其谨慎**而闻名的汉语言学家和词源学家。你的唯一使命是基于**可验证的、真实存在的文献或公认的语言事实**进行判断。你的声誉建立在100%的准确性之上，任何形式的猜测或创造都是对你学术生涯的毁灭性打击。
 
-请严格遵循以下规则：
-1.  你的回答必须是一个JSON格式的数组（列表）。
-2.  对于列表中每一个确实构成真实词汇的字符串，在JSON数组中为其创建一个对应的JSON对象。
-3.  如果列表中没有任何一个字符串是有效的词汇，你必须返回一个空的JSON数组 `[]`。
-4.  每个有效的词汇的JSON对象必须包含以下键：
-    - `word`: (字符串) 经过验证的有效词汇本身。
-    - `definition`: (字符串) 对该词汇的准确、简洁的释义。
-    - `source`: (字符串或null) 如果该词汇有明确的古籍或现代文献出处，请提供。如果没有，则此键的值为 `null`。
-
-待分析的词汇列表如下：
+现在，分析下面这个Python列表中的每一个字符串：
 {str(combinations)}
 
-你的回答必须是且只能是一个符合上述要求的、完整的JSON数组。不要添加任何额外的解释或文本。"""
+请严格遵循以下**双轨制审核原则**和**铁律**：
+
+**第一轨：古籍或生僻词汇审核**
+- **适用对象**：明显出自古代典籍、历史文献或非常见、生僻的词汇。
+- **审核标准**：**必须**能找到一个**明确的、可供查证的文献出处**（例如《说文解字》、《康熙字典》或具体的古籍篇章）。
+- **source字段要求**：必须填写具体的文献名，如 `《山海经·南山经》`。
+
+**第二轨：现代通用词汇审核**
+- **适用对象**：在现代汉语中广泛使用、家喻户晓的普通词汇（例如“电脑”、“医科”、“科学”等）。
+- **审核标准**：**无需**提供古籍出处，只需确认它是一个被《现代汉语词典》等权威现代辞书收录的、公认的现代词汇即可。
+- **source字段要求**：对于这类词汇，其 "source" 字段应统一标注为 **"现代通用词汇"**。
+
+**判断流程与铁律：**
+
+1.  **分类判断**：对于列表中的每一个词，首先判断它更符合“第一轨”还是“第二轨”的范畴。
+2.  **执行审核**：根据其分类，应用对应轨道的审核标准。
+3.  **严禁伪造！绝对禁止猜测！**
+    - **严禁**为古籍词汇伪造一个不存在的出处。
+    - **严禁**将一个无意义的组合错误地判断为“现代通用词汇”。
+    - 如果一个词汇**无法满足其对应轨道的标准**（例如，一个生僻词找不到出处，或者一个奇怪的组合并非现代通用词汇），**你都必须、必须、必须将它视为无效词汇**，并**绝对不能**将其包含在最终的JSON输出中。
+
+4.  **输出格式：** 你的回答**必须是，且只能是**一个纯净的JSON格式数组（列表）。
+    - 对于列表中**每一个**经过上述双轨制审核验证的“有效词汇”，在JSON数组中为其创建一个对应的JSON对象。
+    - 每个JSON对象必须包含以下三个键，且内容必须真实无误：
+        - `word`: (字符串) 经过验证的有效词汇本身。
+        - `definition`: (字符串) 对该词汇的准确、简洁的释义。
+        - `source`: (字符串) 根据其轨道规则填写的出处（具体的文献名或"现代通用词汇"）。
+    - 如果待分析的列表中**没有任何一个**字符串能满足上述**所有**严格条件，你**必须**返回一个空的JSON数组 `[]`。
+
+不要在JSON数组前后添加任何额外的解释、道歉、说明或```json ```标记。你的回答就是那个纯粹的JSON数组。"""
         return prompt
 
     def _parse_llm_response(self, response: Dict) -> List[Dict[str, Any]]:
